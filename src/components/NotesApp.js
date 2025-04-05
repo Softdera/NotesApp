@@ -1,9 +1,23 @@
 import React, { useState, useEffect } from 'react';
 import NoteForm from './NotesForm';
-import NoteList from './NoteList';
 import Modal from './Modal';
 import { useTheme } from '../context/ThemeContext';
 import 'bootstrap/dist/css/bootstrap.min.css';
+
+import {
+  DndContext,
+  closestCenter,
+  PointerSensor,
+  useSensor,
+  useSensors
+} from '@dnd-kit/core';
+import {
+  arrayMove,
+  SortableContext,
+  verticalListSortingStrategy
+} from '@dnd-kit/sortable';
+
+import NoteList from './NoteList'; // will now render SortableNote under the hood
 
 const NotesApp = () => {
   const { darkMode, toggleDarkMode } = useTheme();
@@ -12,64 +26,70 @@ const NotesApp = () => {
   const [search, setSearch] = useState('');
   const [sortBy, setSortBy] = useState('date-desc');
   const [deleteId, setDeleteId] = useState(null);
-  const [currentHistoryIndex, setCurrentHistoryIndex] = useState(0);
 
+  // history / undo‑redo
   const [history, setHistory] = useState([]);
-    const [future, setFuture] = useState([]);
+  const [future, setFuture]   = useState([]);
+  const [currentHistoryIndex, setCurrentHistoryIndex] = useState(-1);
 
-    const updateWithHistory = (newNotes) => {
-        const newHistory = [...history.slice(0, currentHistoryIndex + 1), newNotes];
-        setHistory(newHistory);
-        setCurrentHistoryIndex(newHistory.length - 1);
-        setFuture([]); // Clear redo stack
-        setNotes(newNotes);
-      };
-      
-      
-        
+  const updateWithHistory = (newNotes) => {
+    const head = history.slice(0, currentHistoryIndex + 1);
+    const newHistory = [...head, newNotes];
+    setHistory(newHistory);
+    setCurrentHistoryIndex(newHistory.length - 1);
+    setFuture([]);
+    setNotes(newNotes);
+  };
 
   useEffect(() => {
     const stored = localStorage.getItem('notes');
-    if (stored) setNotes(JSON.parse(stored));
+    if (stored) {
+      const parsed = JSON.parse(stored);
+      setNotes(parsed);
+      setHistory([parsed]);
+      setCurrentHistoryIndex(0);
+    }
   }, []);
 
   useEffect(() => {
     localStorage.setItem('notes', JSON.stringify(notes));
   }, [notes]);
 
-  // Add or update notes
- 
-  const addOrUpdateNote = note => {
+  const addOrUpdateNote = (note) => {
     if (editingNote) {
-      const updated = notes.map(n => (n.id === note.id ? note : n));
+      const updated = notes.map(n => n.id === note.id ? note : n);
       updateWithHistory(updated);
       setEditingNote(null);
     } else {
       updateWithHistory([...notes, note]);
     }
   };
-  
-  
-  
-  
-  
+
   const deleteNote = () => {
     const updated = notes.filter(n => n.id !== deleteId);
     updateWithHistory(updated);
     setDeleteId(null);
   };
-  
 
-  // Filtering and sorting notes
+  // handle drag end
+  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
+  const handleDragEnd = ({ active, over }) => {
+    if (!over || active.id === over.id) return;
+    const oldIndex = notes.findIndex(n => n.id === active.id);
+    const newIndex = notes.findIndex(n => n.id === over.id);
+    const reordered = arrayMove(notes, oldIndex, newIndex);
+    updateWithHistory(reordered);
+  };
+
   const filtered = notes
     .filter(n =>
       n.title.toLowerCase().includes(search.toLowerCase()) ||
       n.content.toLowerCase().includes(search.toLowerCase())
     )
     .sort((a, b) => {
-      if (sortBy === 'title-asc') return a.title.localeCompare(b.title);
+      if (sortBy === 'title-asc')  return a.title.localeCompare(b.title);
       if (sortBy === 'title-desc') return b.title.localeCompare(a.title);
-      if (sortBy === 'date-asc') return new Date(a.createdAt) - new Date(b.createdAt);
+      if (sortBy === 'date-asc')   return new Date(a.createdAt) - new Date(b.createdAt);
       return new Date(b.createdAt) - new Date(a.createdAt);
     });
 
@@ -83,6 +103,7 @@ const NotesApp = () => {
           </button>
         </header>
 
+        {/* search + sort */}
         <div className="row mb-3">
           <div className="col-md-8">
             <input
@@ -109,13 +130,23 @@ const NotesApp = () => {
 
         <NoteForm onSave={addOrUpdateNote} editingNote={editingNote} />
 
-        
-        <NoteList
-            notes={filtered}
-            onEdit={setEditingNote}
-            onDeleteRequest={setDeleteId}
-            setNotes={setNotes}/>
-
+        {/* drag & drop context */}
+        <DndContext
+          sensors={sensors}
+          collisionDetection={closestCenter}
+          onDragEnd={handleDragEnd}
+        >
+          <SortableContext
+            items={filtered.map(n => n.id)}
+            strategy={verticalListSortingStrategy}
+          >
+            <NoteList
+              notes={filtered}
+              onEdit={setEditingNote}
+              onDeleteRequest={setDeleteId}
+            />
+          </SortableContext>
+        </DndContext>
 
         <Modal
           show={deleteId !== null}

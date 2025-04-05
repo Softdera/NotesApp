@@ -1,52 +1,19 @@
 import React from 'react';
-import { DragDropContext, Droppable, Draggable } from 'react-beautiful-dnd';
-import NoteCard from './NoteCard';
-//import ReactMarkdown from 'react-markdown';
+import SortableNote from './SortableNote';
 
-
-const NoteList = ({ notes, onEdit, onDeleteRequest, setNotes }) => {
-  const handleOnDragEnd = (result) => {
-    if (!result.destination) return;
-
-    const items = Array.from(notes);
-    const [reorderedItem] = items.splice(result.source.index, 1);
-    items.splice(result.destination.index, 0, reorderedItem);
-
-    setNotes(items);
-  };
-
+const NoteList = ({ notes, onEdit, onDeleteRequest }) => {
   return (
-    <DragDropContext onDragEnd={handleOnDragEnd}>
-      <Droppable droppableId="notes">
-        {(provided) => (
-          <div
-            className="note-list"
-            {...provided.droppableProps}
-            ref={provided.innerRef}
-          >
-            {notes.map((note, index) => (
-               <Draggable key={note.id} draggableId={note.id.toString()} index={index}>
-               {(provided) => (
-                 <div
-                   ref={provided.innerRef}
-                   {...provided.draggableProps}
-                   {...provided.dragHandleProps}
-                 >
-               
-                 <NoteCard
-                   note={note}
-                   onEdit={() => onEdit(note)}
-                  onDelete={() => onDeleteRequest(note.id)}
-                 />
-                 </div>
-               )}
-             </Draggable>
-            ))}
-            {provided.placeholder}
-          </div>
-        )}
-      </Droppable>
-    </DragDropContext>
+    <div className="note-list">
+      {notes.map(note => (
+        <SortableNote
+          key={note.id}
+          id={note.id}
+          note={note}
+          onEdit={() => onEdit(note)}
+          onDelete={() => onDeleteRequest(note.id)}
+        />
+      ))}
+    </div>
   );
 };
 
