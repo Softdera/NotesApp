@@ -128,8 +128,11 @@ const NotesApp = () => {
           </div>
         </div>
 
-        <NoteForm onSave={addOrUpdateNote} editingNote={editingNote} />
-
+        <NoteForm
+          key={notes.length}
+          onSave={addOrUpdateNote}
+          editingNote={editingNote}
+        />
         {/* drag & drop context */}
         <DndContext
           sensors={sensors}
